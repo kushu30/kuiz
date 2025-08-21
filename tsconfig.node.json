@@ -1,18 +1,15 @@
 {
   "compilerOptions": {
     "composite": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "ESNext",
-    "moduleResolution": "bundler",   // ✅ key change
-    "types": ["node"],
-    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",        // 👈 use node or nodenext
+    "types": ["node", "@netlify/functions"], // 👈 include Netlify + Node
     "esModuleInterop": true,
-    "strict": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "noEmit": true
+    "noEmit": true,
+    "strict": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "netlify/functions/**/*.ts"]
 }

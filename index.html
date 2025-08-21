@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,6 +9,20 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+  (function () {
+    try {
+      var el = document.documentElement;
+      el.classList.remove("dark");       // ensure no dark class
+      el.dataset.theme = "light";        // mark theme
+      el.style.colorScheme = "light";    // for scrollbar, form controls
+      localStorage.setItem("kuiz_theme", "light"); // persist only light
+    } catch (e) {}
+  })();
+</script>
+
+
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

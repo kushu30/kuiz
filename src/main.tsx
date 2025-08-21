@@ -1,13 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import App from "./App.tsx";
+import App from "./App";
 import "./index.css";
-import { useAuth } from "./lib/auth.ts";        // from src/routes/Home.tsx
+import { useAuth } from "@/lib/auth";
 
 function Boot() {
-  const init = useAuth(s => s.init);
-  React.useEffect(() => { init(); }, [init]);
+  const init = useAuth((s) => s.init);
+  React.useEffect(() => { void init(); }, [init]);
   return null;
 }
 
