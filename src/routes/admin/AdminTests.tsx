@@ -13,6 +13,8 @@ const makeCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 export default function AdminTests() {
   const { user, loading } = useAuth();
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [guidelines, setGuidelines] = useState("");
   const [duration, setDuration] = useState(30);
   const [showScore, setShowScore] = useState(true);
   const [items, setItems] = useState<any[]>([]);
@@ -24,7 +26,7 @@ export default function AdminTests() {
   async function load() {
     const { data } = await supabase
       .from("tests")
-      .select("id,title,code,created_at")
+      .select("id,title,code,description,created_at")
       .eq("created_by", user?.id)
       .order("created_at", { ascending: false });
     setItems(data || []);
@@ -40,6 +42,8 @@ export default function AdminTests() {
     const code = makeCode();
     const { error } = await supabase.from("tests").insert({
       title,
+      description: description.trim() || null,
+      guidelines: guidelines.trim() || null,
       duration_minutes: duration,
       show_score: showScore,
       is_public: true,
@@ -48,6 +52,8 @@ export default function AdminTests() {
     });
     if (!error) {
       setTitle(""); 
+      setDescription("");
+      setGuidelines("");
       setDuration(30); 
       setShowScore(true);
       load();
@@ -70,6 +76,23 @@ export default function AdminTests() {
           onChange={(e) => setTitle(e.target.value)}
           required
         />
+        
+        <textarea
+          className="border rounded px-3 py-2 text-sm"
+          placeholder="Description (optional)"
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+
+        <textarea
+          className="border rounded px-3 py-2 text-sm"
+          placeholder="Guidelines shown before quiz starts (optional)"
+          rows={3}
+          value={guidelines}
+          onChange={(e) => setGuidelines(e.target.value)}
+        />
+        
         <input
           type="number"
           className="border rounded px-3 py-2"
@@ -98,6 +121,9 @@ export default function AdminTests() {
           >
             <div className="flex flex-col">
               <div className="font-medium">{it.title}</div>
+              <div className="text-xs text-slate-500 line-clamp-1">
+                {it.description || "No description"}
+              </div>
               <div className="text-xs text-slate-500">
                 Code: {it.code}
               </div>
@@ -144,7 +170,6 @@ export default function AdminTests() {
 
       {/* Share Modal */}
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} link={shareUrl} />
-
 
       {/* Delete Dialog */}
       <Dialog

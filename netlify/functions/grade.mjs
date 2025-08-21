@@ -22,14 +22,26 @@ export const handler = async (event) => {
     process.env.SUPABASE_SERVICE_ROLE
   );
 
-  const { data: attempt, error: aErr } = await supabase
+  // Check attempt exists
+  const { data: attempt, error: attemptError } = await supabase
+    .from("attempts")
+    .select("id")
+    .eq("id", attemptId)
+    .eq("test_id", testId)
+    .single();
+
+  if (attemptError || !attempt) {
+    return { statusCode: 404, body: JSON.stringify({ error: "Attempt not found" }) };
+  }
+
+  const { data: attemptFull, error: aErr } = await supabase
     .from("attempts")
     .select("id, submitted_at, email, name")
     .eq("id", attemptId)
     .eq("test_id", testId)
     .single();
-  if (aErr || !attempt) return { statusCode: 404, body: "Attempt not found" };
-  if (attempt.submitted_at) return { statusCode: 400, body: "Already submitted" };
+  if (aErr || !attemptFull) return { statusCode: 404, body: "Attempt not found" };
+  if (attemptFull.submitted_at) return { statusCode: 400, body: "Already submitted" };
 
   const { data: test, error: tErr } = await supabase
     .from("tests")
@@ -101,13 +113,13 @@ export const handler = async (event) => {
   if (upErr) return { statusCode: 500, body: upErr.message };
 
   let willEmail = false;
-  if (!test.show_score && attempt?.email) {
+  if (!test.show_score && attemptFull?.email) {
     willEmail = true;
     const sendAfter = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const subject = `Your ${test.title} score`;
     const html = `
       <div style="font-family:system-ui,Segoe UI,Arial">
-        <h2>Hi ${attempt.name || attempt.email},</h2>
+        <h2>Hi ${attemptFull.name || attemptFull.email},</h2>
         <p>Thanks for completing <b>${test.title}</b>.</p>
         <p>Your score: <b>${score}</b></p>
         <p>— Kuiz</p>
@@ -115,7 +127,7 @@ export const handler = async (event) => {
     `;
     await supabase.from("score_emails").insert({
       attempt_id: attemptId,
-      email: attempt.email,
+      email: attemptFull.email,
       subject,
       html,
       send_after: sendAfter,

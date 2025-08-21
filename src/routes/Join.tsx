@@ -21,53 +21,41 @@ export default function Join(){
     if (c) setCode(c);
   }, [searchParams]);
 
-  async function handleJoin(e: React.FormEvent){
+  async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
-    setErr("");
-    if (!user) { setErr("Please sign in first."); return; }
     setBusy(true);
+    setErr("");
+    
+    const { data: test } = await supabase
+      .from("tests")
+      .select("id")
+      .eq("code", code.toUpperCase())
+      .single();
 
-    try {
-      const c = code.trim().toUpperCase();
-      // 1) Find test by code
-      const { data: test, error: tErr } = await supabase
-        .from("tests")
-        .select("id")
-        .eq("code", c)
-        .single();
-      if (tErr || !test) throw new Error("Invalid code.");
-
-      // 2) Try to create attempt
-      const displayName = user.user_metadata?.full_name || user.user_metadata?.name || user.email;
-      const { data: attempt, error: aErr, status } = await supabase
-        .from("attempts")
-        .insert({ test_id: test.id, user_id: user.id, name: displayName, email: user.email })
-        .select("id")
-        .single();
-
-      if (aErr) {
-        // 409 conflict -> attempt already exists: fetch it
-        const isConflict = (status === 409) || (aErr as any)?.code === "23505" || /duplicate|unique/i.test(aErr.message);
-        if (!isConflict) throw aErr;
-
-        const { data: existing, error: sErr } = await supabase
-          .from("attempts")
-          .select("id")
-          .eq("test_id", test.id)
-          .eq("user_id", user.id)
-          .single();
-        if (sErr || !existing) throw new Error("Could not resume your attempt.");
-        nav(`/test/${test.id}?attempt=${existing.id}`);
-        return;
-      }
-
-      // 3) New attempt path
-      nav(`/test/${test.id}?attempt=${attempt!.id}`);
-    } catch (e: any) {
-      setErr(e?.message || "Something went wrong.");
-    } finally {
+    if (!test) {
+      setErr("No quiz found for that code.");
       setBusy(false);
+      return;
     }
+
+    // create attempt
+    const { data: attempt, error } = await supabase
+      .from("attempts")
+      .insert({
+        test_id: test.id,
+        user_id: user?.id ?? null, // if you're storing auth users
+        started_at: new Date().toISOString()
+      })
+      .select("id")
+      .single();
+
+    if (error || !attempt) {
+      setErr("Could not start attempt. Try again.");
+      setBusy(false);
+      return;
+    }
+
+    nav(`/take/${test.id}?attempt=${attempt.id}`);
   }
 
   return (
