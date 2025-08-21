@@ -11,6 +11,19 @@ type Q   = { id: string; body: string; media_url: string | null; type: "mcq"|"te
 function useQuery(){ return new URLSearchParams(useLocation().search); }
 const pad = (n:number)=>String(n).padStart(2,"0");
 
+// Add baseUrl function
+function baseUrl() {
+  if (typeof window === 'undefined') return 'https://yourdomain.com';
+  return window.location.origin;
+}
+
+// Add directStartLink function
+export function directStartLink(testId: string) {
+  const url = new URL(`/test/${testId}`, baseUrl());
+  url.searchParams.set("autostart", "1");
+  return url.toString();
+}
+
 export default function TakeTest() {
   const { id: testId } = useParams();
   const q = useQuery();
@@ -200,7 +213,7 @@ export default function TakeTest() {
             <div className="whitespace-pre-wrap text-sm text-neutral-700">{test.guidelines}</div>
             <div className="flex justify-end">
               <Button onClick={()=>setShowGuide(false)}>Start quiz</Button>
-            </div>
+          </div>
           </CardBody>
         </Card>
       ) : (

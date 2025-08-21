@@ -6,6 +6,8 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import ShareModal from "@/components/ShareModal";
+import { testJoinLink } from "@/lib/share";
 
 type DraftQ = {
   type: "mcq" | "text";
@@ -27,6 +29,8 @@ export default function AdminTestDetail(){
   const [options, setOptions] = useState([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
   const [correct, setCorrect] = useState("A");
   const [textAccepted, setTextAccepted] = useState<string>("");
+  const [testMeta, setTestMeta] = useState<{title:string; code:string} | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // AI
   const [topic, setTopic] = useState("");
@@ -54,7 +58,14 @@ export default function AdminTestDetail(){
       .order("order_index");
     setQs(data || []);
   }
-  useEffect(()=>{ load(); }, [testId]);
+
+  useEffect(() => {
+    (async () => {
+      const { data: t } = await supabase.from("tests").select("title,code").eq("id", testId).single();
+      if (t) setTestMeta(t);
+      await load();
+    })();
+  }, [testId]);
 
   // ---- Manual add
   async function addQuestion(e: React.FormEvent){
@@ -424,6 +435,34 @@ export default function AdminTestDetail(){
         ))}
         {qs.length === 0 && <Card><CardBody>No questions yet.</CardBody></Card>}
       </div>
+
+      {/* Add the Done + Share controls */}
+      {testMeta && (
+        <div className="flex justify-between items-center mt-8 p-4 bg-neutral-50 rounded-lg">
+          <div className="text-sm text-neutral-500">
+            Code: <span className="font-mono font-medium">{testMeta.code}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setShareOpen(true)}>Share</Button>
+            <Button
+              className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50"
+              onClick={() => (window.location.href = "/admin/tests")}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Add the Share Modal */}
+      {testMeta && (
+        <ShareModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          title={`Share "${testMeta.title}"`}
+          link={testJoinLink(testMeta.code)}
+        />
+      )}
     </main>
   );
 }

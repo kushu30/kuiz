@@ -2,125 +2,165 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { FiBarChart2 } from "react-icons/fi";
+import { Share2, Trash2, Edit3 } from "lucide-react";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import Textarea from "@/components/ui/Textarea";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { AnimatePresence, motion } from "framer-motion";
+import Dialog from "@/components/ui/Dialog";
+import ShareModal from "@/components/ShareModal";
 
-const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+const makeCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
 export default function AdminTests() {
   const { user, loading } = useAuth();
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [duration, setDuration] = useState(30);
   const [showScore, setShowScore] = useState(true);
-  const [isPublic, setIsPublic] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
   const [items, setItems] = useState<any[]>([]);
-  const [guidelines, setGuidelines] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   async function load() {
-    setErrorMsg("");
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("tests")
       .select("id,title,code,created_at")
       .eq("created_by", user?.id)
       .order("created_at", { ascending: false });
-    if (error) setErrorMsg(error.message);
     setItems(data || []);
   }
 
-  useEffect(() => { if (user && !loading) load(); }, [user?.id, loading]);
+  useEffect(() => { 
+    if (user && !loading) load(); 
+  }, [user, loading]);
 
-  async function createTest(e: React.FormEvent){
+  async function createTest(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-    setSubmitting(true); setErrorMsg("");
-    const dur = Math.max(1, Math.min(300, duration));
-
-    let tries = 0, lastErr = "";
-    while (tries < 5) {
-      tries++;
-      const code = genCode();
-      const { error } = await supabase.from("tests").insert({
-        title: title.trim(),
-        description: description.trim() || null,
-        duration_minutes: dur,
-        show_score: showScore,
-        is_public: isPublic,
-        code,
-        created_by: user.id,
-        guidelines: guidelines.trim() || null,
-      });
-      if (!error) {
-        setTitle(""); setDescription(""); setDuration(30); setShowScore(true); setIsPublic(true); setGuidelines("");
-        await load(); setSubmitting(false); return;
-      }
-      if ((error as any)?.code === "23505" || /duplicate|unique/i.test(error.message)) { lastErr = "Code collision; retrying…"; continue; }
-      lastErr = error.message; break;
+    const code = makeCode();
+    const { error } = await supabase.from("tests").insert({
+      title,
+      duration_minutes: duration,
+      show_score: showScore,
+      is_public: true,
+      code,
+      created_by: user.id,
+    });
+    if (!error) {
+      setTitle(""); 
+      setDuration(30); 
+      setShowScore(true);
+      load();
     }
-    setSubmitting(false);
-    setErrorMsg(lastErr || "Failed to create quiz.");
   }
 
-  if (loading) return <main>Loading…</main>;
-  if (!user) return <main>Please sign in.</main>;
+  if (loading) return <main className="p-6">Loading…</main>;
+  if (!user) return <main className="p-6">Please sign in.</main>;
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card>
-        <CardHeader title="Create New Quiz" subtitle="Title, duration and options" />
-        <CardBody>
-          <form onSubmit={createTest} className="grid gap-3">
-            <Input placeholder="Quiz title" value={title} onChange={e=>setTitle(e.target.value)} required />
-            <Textarea placeholder="Description (optional)" value={description} onChange={e=>setDescription(e.target.value)} rows={2} />
-            <Textarea placeholder="Guidelines (optional, shown before quiz starts)" value={guidelines} onChange={e=>setGuidelines(e.target.value)} rows={3} />
-            <div className="flex gap-2">
-              <Input type="number" min={1} max={300} value={duration} onChange={e=>setDuration(parseInt(e.target.value||"0"))} placeholder="Duration (min)" />
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={showScore} onChange={e=>setShowScore(e.target.checked)} />
-                Show score
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={isPublic} onChange={e=>setIsPublic(e.target.checked)} />
-                Public
-              </label>
-            </div>
-            <Button disabled={submitting}>{submitting ? "Creating…" : "Create quiz"}</Button>
-            {errorMsg && <div className="text-sm text-red-600">{errorMsg}</div>}
-          </form>
-        </CardBody>
-      </Card>
+    <main className="p-6 space-y-6">
+      <h1 className="text-xl font-semibold">Your Quizzes</h1>
 
-      <div className="space-y-3">
-        <AnimatePresence initial={false}>
-          {items.map(it => (
-            <motion.div
-              key={it.id}
-              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
-            >
-              <Card>
-                <CardBody className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="font-medium">{it.title}</div>
-                    <div className="text-xs text-neutral-500">Code: {it.code}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Link className="rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50" to={`/admin/tests/${it.id}`}>Add Questions</Link>
-                    <Link className="rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50" to={`/admin/results/${it.id}`}>Results</Link>
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+      {/* Create Form */}
+      <form onSubmit={createTest} className="grid gap-3 max-w-md">
+        <input
+          className="border rounded px-3 py-2"
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+        <input
+          type="number"
+          className="border rounded px-3 py-2"
+          placeholder="Duration (min)"
+          value={duration}
+          onChange={(e) => setDuration(parseInt(e.target.value || "0"))}
+          min={1}
+        />
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={showScore}
+            onChange={(e) => setShowScore(e.target.checked)}
+          />
+          Show final score to participant
+        </label>
+        <Button className="w-fit">Create</Button>
+      </form>
+
+      {/* List */}
+      <div className="space-y-2">
+        {items.map((it) => (
+          <div
+            key={it.id}
+            className="flex items-center justify-between rounded-lg border p-3 hover:bg-neutral-50"
+          >
+            <div className="flex flex-col">
+              <div className="font-medium">{it.title}</div>
+              <div className="text-xs text-slate-500">
+                Code: {it.code}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShareUrl(`${window.location.origin}/join?code=${it.code}`);
+                  setShareOpen(true);
+                }}
+                title="Share"
+                className="p-2 rounded hover:bg-neutral-100"
+              >
+                <Share2 size={16} />
+              </button>
+
+              <Link 
+                to={`/admin/tests/${it.id}`} 
+                title="Edit" 
+                className="p-2 rounded hover:bg-neutral-100"
+              >
+                <Edit3 size={16} />
+              </Link>
+
+              <Link to={`/admin/results/${it.id}`} title="View Results" className="p-2 rounded hover:bg-neutral-100">
+                <FiBarChart2 className="w-4 h-4" />
+              </Link>
+
+              <button
+                onClick={() => {
+                  setDeleteId(it.id);
+                  setDeleteOpen(true);
+                }}
+                title="Delete"
+                className="p-2 rounded hover:bg-neutral-100 text-red-600"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && <div>No quizzes yet.</div>}
       </div>
-    </div>
+
+      {/* Share Modal */}
+      <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} link={shareUrl} />
+
+
+      {/* Delete Dialog */}
+      <Dialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete Test"
+        onConfirm={async () => {
+          if (!deleteId) return;
+          await supabase.from("tests").delete().eq("id", deleteId);
+          setDeleteId(null);
+          setDeleteOpen(false);
+          load();
+        }}
+      >
+        Are you sure you want to delete this test?
+      </Dialog>
+    </main>
   );
 }
