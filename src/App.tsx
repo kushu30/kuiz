@@ -15,6 +15,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/join" element={<Join />} />
         <Route path="/test/:id" element={<TakeTest />} />
+        <Route path="/take/:id" element={<TakeTest />} />
         <Route path="/admin/tests" element={<RequireAuth><AdminTests /></RequireAuth>} />
         <Route path="/admin/tests/:id" element={<RequireAuth><AdminTestDetail /></RequireAuth>} />
         <Route path="/admin/results/:id" element={<RequireAuth><AdminResults /></RequireAuth>} />
