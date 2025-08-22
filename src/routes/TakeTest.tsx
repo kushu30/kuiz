@@ -226,8 +226,8 @@ export default function TakeTest() {
         } catch {
           console.warn("Failed to remove endKey from localStorage.");
         }
-      }
-      setDone({ show: true, score: data?.score, willEmail: data?.willEmail });
+      }       
+          setDone({ show: true, score: typeof data.score === "number" ? data.score : undefined, willEmail: !!data.willEmail });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
       setError(err.message || "Failed to submit answers.");
