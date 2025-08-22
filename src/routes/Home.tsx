@@ -136,7 +136,7 @@ export default function Home() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Link to="/join">
-                    <Button className="bg-white/80 backdrop-blur-sm text-gray-900 border-2 border-gray-200 hover:bg-white hover:border-gray-300 px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300">
+                    <Button className="px-8 py-4 text-lg bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black shadow-lg hover:shadow-xl transition-all duration-300 text-white">
                       Join with code
                     </Button>
                   </Link>
