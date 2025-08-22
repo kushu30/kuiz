@@ -22,7 +22,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       {/* Global background gradient (behind everything) */}
 <div className="pointer-events-none fixed inset-0 -z-10 h-full w-full">
   <div className="absolute inset-0 bg-white bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]" />
-    <div className="absolute inset-0 rotate-180 [background:radial-gradient(60%_120%_at_50%_50%,hsla(0,0%,100%,0)_0,rgba(0,0,0,0.10)_100%)]" />
+    <div className="absolute inset-0 rotate-180 [background:radial-gradient(60%_120%_at_50%_50%,hsla(0,0%,100%,0)_0,rgba(0,0,0,0.20)_100%)]" />
 
 </div><header className="sticky top-0 z-30 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">

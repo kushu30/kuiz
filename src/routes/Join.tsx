@@ -14,12 +14,31 @@ export default function Join() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const codeFromUrl = (searchParams.get("code") || "").toUpperCase();
 
   // Prefill ?code=ABC123 from URL parameters
   useEffect(() => {
-    const c = (searchParams.get("code") || "").toUpperCase();
-    if (c) setCode(c);
-  }, [searchParams]);
+    if (codeFromUrl) setCode(codeFromUrl);
+  }, [codeFromUrl]);
+
+  // Restore code if we stashed it before redirect
+  useEffect(() => {
+    if (!code) {
+      const saved = localStorage.getItem("kuiz_join_code");
+      if (saved) setCode(saved.toUpperCase());
+    }
+  }, []);
+
+  async function signInGoogle() {
+    // keep code so it persists through the OAuth redirect round-trip
+    if (code) localStorage.setItem("kuiz_join_code", code);
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/join?code=" + (code || codeFromUrl || "")
+      }
+    });
+  }
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -99,6 +118,21 @@ export default function Join() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Early return if not signed in
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto p-4">
+        <Card>
+          <CardHeader title="Sign in to Join" subtitle="Use your Google account to continue" />
+          <CardBody className="grid gap-3">
+            <Button onClick={signInGoogle}>Continue with Google</Button>
+            {code && <div className="text-xs text-neutral-500">Joining code detected: <b>{code}</b></div>}
+          </CardBody>
+        </Card>
+      </div>
+    );
   }
 
   return (

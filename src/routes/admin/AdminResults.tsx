@@ -25,6 +25,27 @@ type Row = {
   accepted?: string[] | null;
 };
 
+type AnswerRow = {
+  id: string;
+  question_id: string;
+  option_id: string | null;
+  text_input: string | null;
+  is_correct: boolean | null;
+  question: Question | null;
+  option: Option | null;
+};
+
+// Type for raw answers that might have arrays
+type RawAns = {
+  id: string;
+  question_id: string;
+  option_id: string | null;
+  text_input: string | null;
+  is_correct: boolean | null;
+  question?: Question | Question[] | null;
+  option?: Option | Option[] | null;
+};
+
 export default function AdminResults() {
   const { id: testId } = useParams<{ id: string }>();
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -59,9 +80,18 @@ export default function AdminResults() {
     setRows([]);
     setError(null);
 
-    const { data: ans, error: ansError } = await supabase
+    // Fetch answers with related question and option data
+    const { data: answers, error: ansError } = await supabase
       .from("answers")
-      .select("id, is_correct, text_input, question_id, option_id")
+      .select(`
+        id,
+        question_id,
+        option_id,
+        text_input,
+        is_correct,
+        question:questions(id, body, type, text_policy),
+        option:options(id, label, text, is_correct)
+      `)
       .eq("attempt_id", a.id);
       
     if (ansError) {
@@ -69,63 +99,78 @@ export default function AdminResults() {
       return;
     }
 
-    if (!ans || ans.length === 0) {
+    if (!answers || answers.length === 0) {
       setRows([]);
       return;
     }
 
-    const qIds = [...new Set(ans.map((r) => r.question_id))];
-    const { data: qs, error: qError } = await supabase
-      .from("questions")
-      .select("id, body, type, text_policy")
-      .in("id", qIds);
-      
-    if (qError) {
-      setError("Failed to load questions: " + qError.message);
-      return;
-    }
-
-    const { data: opts, error: optError } = await supabase
-      .from("options")
-      .select("id, question_id, label, text, is_correct")
-      .in("question_id", qIds);
-      
-    if (optError) {
-      setError("Failed to load options: " + optError.message);
-      return;
-    }
-
-    const qById = new Map<string, Question>((qs || []).map((q) => [q.id, q]));
-    const correctByQ = new Map<string, Option>((opts || []).filter((o) => o.is_correct).map((o) => [o.question_id, o]));
-    const optById = new Map<string, Option>((opts || []).map((o) => [o.id, o]));
-
-    const full: Row[] = ans.map((r) => {
-      const q = qById.get(r.question_id);
-      if (!q) {
-        return {
-          id: r.id,
-          is_correct: r.is_correct,
-          question: { id: r.question_id, body: "Unknown question", type: "mcq" },
-          option: null,
-          text_input: r.text_input,
-          correct_option: null,
-          accepted: null,
-        };
-      }
+    // Answers may have question/option as arrays -> normalize to single object
+    const norm: AnswerRow[] = (answers as RawAns[]).map((a) => {
+      const q = Array.isArray(a.question) ? a.question[0] ?? null : (a.question ?? null);
+      const o = Array.isArray(a.option) ? a.option[0] ?? null : (a.option ?? null);
       return {
-        id: r.id,
-        is_correct: r.is_correct,
-        question: { id: q.id, body: q.body, type: q.type },
-        option: r.option_id && optById.get(r.option_id) ? { 
-          label: optById.get(r.option_id)!.label, 
-          text: optById.get(r.option_id)!.text 
-        } : null,
-        text_input: r.text_input,
-        correct_option: correctByQ.get(r.question_id) ? { 
-          label: correctByQ.get(r.question_id)!.label, 
-          text: correctByQ.get(r.question_id)!.text 
-        } : null,
-        accepted: q.text_policy?.accepted ?? null,
+        id: a.id,
+        question_id: a.question_id,
+        option_id: a.option_id,
+        text_input: a.text_input,
+        is_correct: a.is_correct,
+        question: q,
+        option: o,
+      };
+    });
+
+    // Get correct options for all questions in this attempt
+    const questionIds = norm.map((a) => a.question_id);
+    const { data: correctOpts, error: correctError } = await supabase
+      .from("options")
+      .select("question_id, label, text, id")
+      .eq("is_correct", true)
+      .in("question_id", questionIds);
+      
+    if (correctError) {
+      setError("Failed to load correct options: " + correctError.message);
+      return;
+    }
+
+    // Create a map of correct options by question ID
+    const correctByQuestionId = new Map();
+    correctOpts?.forEach(opt => {
+      correctByQuestionId.set(opt.question_id, {
+        label: opt.label,
+        text: opt.text,
+        id: opt.id
+      });
+    });
+
+    // Transform the data for display
+    const full: Row[] = norm.map((answer) => {
+      const question = answer.question;
+      const correctOption = correctByQuestionId.get(answer.question_id) || null;
+
+      let isCorrect = answer.is_correct;
+      if (isCorrect === null && answer.option_id) {
+        isCorrect =
+          answer.option?.is_correct ??
+          (correctOption ? answer.option_id === correctOption.id : false);
+      }
+
+      return {
+        id: answer.id,
+        is_correct: isCorrect,
+        question: {
+          id: question?.id || answer.question_id,
+          body: question?.body || "Unknown question",
+          type: (question?.type as "mcq" | "text") || "mcq",
+        },
+        option:
+          answer.option_id && answer.option
+            ? { label: answer.option.label, text: answer.option.text }
+            : null,
+        text_input: answer.text_input,
+        correct_option: correctOption
+          ? { label: correctOption.label, text: correctOption.text }
+          : null,
+        accepted: question?.text_policy?.accepted || null,
       };
     });
 
