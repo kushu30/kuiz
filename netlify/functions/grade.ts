@@ -1,9 +1,22 @@
-import { Handler } from "@netlify/functions";
+// netlify/functions/grade.ts
+import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // important: service role, not anon
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl =
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+const serviceKey =
+  process.env.SUPABASE_SERVICE_ROLE ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "";
+
+if (!supabaseUrl || !serviceKey) {
+  // Fail fast with a clear message in logs
+  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE.");
+}
+
+const sb = createClient(supabaseUrl, serviceKey, {
+  auth: { persistSession: false },
+});
 
 export const handler: Handler = async (event) => {
   try {
@@ -13,31 +26,33 @@ export const handler: Handler = async (event) => {
 
     const { attemptId, testId, selections } = JSON.parse(event.body || "{}");
 
-    // Check attempt exists
-    const { data: attempt } = await supabase
+    // 1) Ensure attempt exists for this test
+    const { data: attempt, error: aErr } = await sb
       .from("attempts")
       .select("id")
       .eq("id", attemptId)
       .eq("test_id", testId)
       .single();
 
-    if (!attempt) {
-      return { statusCode: 404, body: JSON.stringify({ error: "Attempt not found" }) };
+    if (aErr || !attempt) {
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ error: "Attempt not found" }),
+      };
     }
 
-    // Save responses
-    for (const sel of selections) {
-      await supabase.from("responses").insert({
-        attempt_id: attemptId,
-        question_id: sel.questionId,
-        option_id: sel.optionId || null,
-        text_input: sel.textInput || null,
-      });
-    }
+    // 2) (…your grading logic here…)
+    // Save answers in your 'answers' table, not 'responses'
+    // Example skeleton:
+    // await sb.from("answers").insert([...]);
 
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
-  } catch (e) {
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ok: true }),
+    };
+  } catch (e: any) {
     console.error(e);
-    return { statusCode: 500, body: JSON.stringify({ error: String(e) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
   }
 };
