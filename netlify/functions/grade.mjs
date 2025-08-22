@@ -6,22 +6,29 @@ export const handler = async (event) => {
   }
 
   let payload = {};
-  try {
-    payload = JSON.parse(event.body || "{}");
-  } catch {
-    return { statusCode: 400, body: "Invalid JSON" };
-  }
+  try { payload = JSON.parse(event.body || "{}"); }
+  catch { return { statusCode: 400, body: "Invalid JSON" }; }
 
   const { attemptId, testId, selections = [] } = payload;
   if (!attemptId || !testId) {
     return { statusCode: 400, body: "Missing attemptId/testId" };
   }
 
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE
-  );
+  // ✅ Use server env names; fallback to VITE_ only if present
+  const supabaseUrl =
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  if (!supabaseUrl || !serviceKey) {
+    return { statusCode: 500, body: "Server misconfigured: missing SUPABASE_URL / SUPABASE_SERVICE_ROLE" };
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  // … the rest of your code unchanged …
+  // (kept exactly as you pasted)
+  // ----------------------------------
   const { data: attempt, error: aErr } = await supabase
     .from("attempts")
     .select("id, submitted_at, email, name")

@@ -22,58 +22,74 @@ export default function Join() {
   }, [searchParams]);
 
   async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    
-    // Validate code format (optional)
-    if (code.length !== 6) {
-      setError("Please enter a 6-character code");
-      setBusy(false);
+  e.preventDefault();
+  setBusy(true);
+  setError("");
+
+  if (code.trim().length !== 6) {
+    setError("Please enter a 6-character code");
+    setBusy(false);
+    return;
+  }
+
+  try {
+    const codeUp = code.trim().toUpperCase();
+
+    // 1) Find test by code
+    const { data: test, error: tErr } = await supabase
+      .from("tests")
+      .select("id, title")
+      .eq("code", codeUp)
+      .single();
+    if (tErr || !test) throw new Error("No quiz found for that code.");
+
+    // 2) Try to create attempt
+    const displayName =
+      (user?.user_metadata?.full_name as string) ||
+      (user?.user_metadata?.name as string) ||
+      (user?.email as string) ||
+      null;
+
+    const { data: attempt, error: aErr, status } = await supabase
+      .from("attempts")
+      .insert({
+        test_id: test.id,
+        user_id: user?.id ?? null,
+        started_at: new Date().toISOString(),
+        // uncomment these if your attempts table has these columns:
+        // name: displayName,
+        // email: user?.email ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (aErr) {
+      const isConflict = status === 409 || (aErr as any)?.code === "23505";
+      if (!isConflict) throw aErr;
+
+      // 3) On duplicate, fetch existing attempt for this user+test
+      const { data: existing, error: sErr } = await supabase
+        .from("attempts")
+        .select("id")
+        .eq("test_id", test.id)
+        .eq("user_id", user?.id ?? null)
+        .single();
+
+      if (sErr || !existing) throw new Error("Could not resume your attempt.");
+      navigate(`/take/${test.id}?attempt=${existing.id}`);
       return;
     }
 
-    try {
-      // Find test by code
-      const { data: test, error: testError } = await supabase
-        .from("tests")
-        .select("id, title")
-        .eq("code", code.toUpperCase())
-        .single();
-
-      if (testError || !test) {
-        setError("No quiz found for that code.");
-        setBusy(false);
-        return;
-      }
-
-      // Create attempt
-      const { data: attempt, error: attemptError } = await supabase
-        .from("attempts")
-        .insert({
-          test_id: test.id,
-          user_id: user?.id ?? null, // Store user ID if authenticated
-          started_at: new Date().toISOString()
-        })
-        .select("id")
-        .single();
-
-      if (attemptError || !attempt) {
-        console.error(attemptError);
-        setError("Could not join test. Please try again.");
-        setBusy(false);
-        return;
-      }
-
-      // Redirect with attempt id
-      navigate(`/take/${test.id}?attempt=${attempt.id}`);
-      
-    } catch (err) {
-      console.error(err);
-      setError("An unexpected error occurred. Please try again.");
-      setBusy(false);
-    }
+    // 4) New attempt path
+    navigate(`/take/${test.id}?attempt=${attempt!.id}`);
+  } catch (err: any) {
+    console.error(err);
+    setError(err?.message || "Could not join test. Please try again.");
+  } finally {
+    setBusy(false);
   }
+}
+
 
   return (
     <div className="max-w-md mx-auto p-4">

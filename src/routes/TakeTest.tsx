@@ -262,7 +262,7 @@ export default function TakeTest() {
     return (
       <main className="max-w-xl mx-auto p-4 space-y-4">
         <div className="rounded-xl border bg-white p-6 space-y-2">
-          <h1 className="text-xl font-semibold">Submitted 🎉</h1>
+          <h1 className="text-xl font-semibold">Submitted!</h1>
           {done.willEmail ? (
             <p className="text-sm text-neutral-600">
               Thanks for completing the quiz. Your score will be emailed to you in about 10 minutes.
