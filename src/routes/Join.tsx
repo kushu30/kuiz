@@ -22,74 +22,84 @@ export default function Join() {
   }, [searchParams]);
 
   async function handleJoin(e: React.FormEvent) {
-  e.preventDefault();
-  setBusy(true);
-  setError("");
+    e.preventDefault();
+    setBusy(true);
+    setError("");
 
-  if (code.trim().length !== 6) {
-    setError("Please enter a 6-character code");
-    setBusy(false);
-    return;
-  }
-
-  try {
-    const codeUp = code.trim().toUpperCase();
-
-    // 1) Find test by code
-    const { data: test, error: tErr } = await supabase
-      .from("tests")
-      .select("id, title")
-      .eq("code", codeUp)
-      .single();
-    if (tErr || !test) throw new Error("No quiz found for that code.");
-
-    // 2) Try to create attempt
-    const displayName =
-      (user?.user_metadata?.full_name as string) ||
-      (user?.user_metadata?.name as string) ||
-      (user?.email as string) ||
-      null;
-
-    const { data: attempt, error: aErr, status } = await supabase
-      .from("attempts")
-      .insert({
-        test_id: test.id,
-        user_id: user?.id ?? null,
-        started_at: new Date().toISOString(),
-        // uncomment these if your attempts table has these columns:
-        // name: displayName,
-        // email: user?.email ?? null,
-      })
-      .select("id")
-      .single();
-
-    if (aErr) {
-      const isConflict = status === 409 || (aErr as any)?.code === "23505";
-      if (!isConflict) throw aErr;
-
-      // 3) On duplicate, fetch existing attempt for this user+test
-      const { data: existing, error: sErr } = await supabase
-        .from("attempts")
-        .select("id")
-        .eq("test_id", test.id)
-        .eq("user_id", user?.id ?? null)
-        .single();
-
-      if (sErr || !existing) throw new Error("Could not resume your attempt.");
-      navigate(`/take/${test.id}?attempt=${existing.id}`);
+    if (code.trim().length !== 6) {
+      setError("Please enter a 6-character code");
+      setBusy(false);
       return;
     }
 
-    // 4) New attempt path
-    navigate(`/take/${test.id}?attempt=${attempt!.id}`);
-  } catch (err: any) {
-    console.error(err);
-    setError(err?.message || "Could not join test. Please try again.");
-  } finally {
-    setBusy(false);
-  }
-}
+    try {
+      const codeUp = code.trim().toUpperCase();
 
+      // 1) Find test by code
+      const { data: test, error: tErr } = await supabase
+        .from("tests")
+        .select("id, title, show_score")
+        .eq("code", codeUp)
+        .single();
+      
+      if (tErr || !test) throw new Error("No quiz found for that code.");
+
+      const displayName =
+        (user?.user_metadata?.full_name as string) ||
+        (user?.user_metadata?.name as string) ||
+        (user?.email as string) ||
+        null;
+
+      const email = (user?.email as string) || null;
+
+      // 2) Try to create attempt
+      const { data: attempt, error: aErr, status } = await supabase
+        .from("attempts")
+        .insert({
+          test_id: test.id,
+          user_id: user?.id ?? null,
+          started_at: new Date().toISOString(),
+          name: displayName,
+          email
+        })
+        .select("id")
+        .single();
+
+      if (aErr) {
+        const isConflict = status === 409 || (aErr as any)?.code === "23505";
+        if (!isConflict) throw aErr;
+
+        // 3) On duplicate, fetch existing attempt for this user+test
+        const { data: existing, error: sErr } = await supabase
+          .from("attempts")
+          .select("id, name, email")
+          .eq("test_id", test.id)
+          .eq("user_id", user?.id ?? null)
+          .single();
+
+        if (sErr || !existing) throw new Error("Could not resume your attempt.");
+
+        // Backfill name/email if missing
+        if (!existing.name || !existing.email) {
+          await supabase
+            .from("attempts")
+            .update({ name: displayName, email })
+            .eq("id", existing.id);
+        }
+
+        navigate(`/take/${test.id}?attempt=${existing.id}`);
+        return;
+      }
+
+      // 4) New attempt path
+      navigate(`/take/${test.id}?attempt=${attempt!.id}`);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Could not join test. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="max-w-md mx-auto p-4">

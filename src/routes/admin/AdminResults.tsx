@@ -3,7 +3,16 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 
-type Attempt = { id: string; name: string | null; email: string | null; score: number | null; submitted_at: string | null };
+type Attempt = { 
+  id: string; 
+  user_id: string | null;
+  name: string | null; 
+  email: string | null; 
+  score: number | null; 
+  started_at: string;
+  submitted_at: string | null;
+};
+
 type Question = { id: string; body: string; type: "mcq" | "text"; text_policy: { accepted: string[] } | null };
 type Option = { id: string; question_id: string; label: string; text: string; is_correct: boolean };
 type Row = {
@@ -24,21 +33,26 @@ export default function AdminResults() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from("attempts")
-        .select("id,name,email,score,submitted_at")
-        .eq("test_id", testId)
-        .order("submitted_at", { ascending: false });
-      if (error) {
-        setError("Failed to load attempts: " + error.message);
-        setAttempts([]);
-        return;
-      }
-      setAttempts(data || []);
-      setError(null);
-    })();
+    loadAttempts();
   }, [testId]);
+
+  async function loadAttempts() {
+    if (!testId) return;
+    
+    const { data, error } = await supabase
+      .from("attempts")
+      .select("id, user_id, name, email, score, started_at, submitted_at")
+      .eq("test_id", testId)
+      .order("started_at", { ascending: false });
+      
+    if (error) {
+      setError("Failed to load attempts: " + error.message);
+      setAttempts([]);
+      return;
+    }
+    setAttempts(data || []);
+    setError(null);
+  }
 
   async function openAttempt(a: Attempt) {
     setSelected(a);
@@ -47,8 +61,9 @@ export default function AdminResults() {
 
     const { data: ans, error: ansError } = await supabase
       .from("answers")
-      .select("id,is_correct,text_input,question_id,option_id")
+      .select("id, is_correct, text_input, question_id, option_id")
       .eq("attempt_id", a.id);
+      
     if (ansError) {
       setError("Failed to load answers: " + ansError.message);
       return;
@@ -62,8 +77,9 @@ export default function AdminResults() {
     const qIds = [...new Set(ans.map((r) => r.question_id))];
     const { data: qs, error: qError } = await supabase
       .from("questions")
-      .select("id,body,type,text_policy")
+      .select("id, body, type, text_policy")
       .in("id", qIds);
+      
     if (qError) {
       setError("Failed to load questions: " + qError.message);
       return;
@@ -71,8 +87,9 @@ export default function AdminResults() {
 
     const { data: opts, error: optError } = await supabase
       .from("options")
-      .select("id,question_id,label,text,is_correct")
+      .select("id, question_id, label, text, is_correct")
       .in("question_id", qIds);
+      
     if (optError) {
       setError("Failed to load options: " + optError.message);
       return;
@@ -99,9 +116,15 @@ export default function AdminResults() {
         id: r.id,
         is_correct: r.is_correct,
         question: { id: q.id, body: q.body, type: q.type },
-        option: r.option_id && optById.get(r.option_id) ? { label: optById.get(r.option_id)!.label, text: optById.get(r.option_id)!.text } : null,
+        option: r.option_id && optById.get(r.option_id) ? { 
+          label: optById.get(r.option_id)!.label, 
+          text: optById.get(r.option_id)!.text 
+        } : null,
         text_input: r.text_input,
-        correct_option: correctByQ.get(r.question_id) ? { label: correctByQ.get(r.question_id)!.label, text: correctByQ.get(r.question_id)!.text } : null,
+        correct_option: correctByQ.get(r.question_id) ? { 
+          label: correctByQ.get(r.question_id)!.label, 
+          text: correctByQ.get(r.question_id)!.text 
+        } : null,
         accepted: q.text_policy?.accepted ?? null,
       };
     });
@@ -123,13 +146,14 @@ export default function AdminResults() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-medium">{a.name || a.email}</div>
+                  <div className="font-medium">{a.name || a.email || "Anonymous"}</div>
                   <div className="text-xs text-neutral-500">{a.email}</div>
                 </div>
                 <div className="text-sm">{a.score ?? 0}</div>
               </div>
               <div className="text-xs text-neutral-500">
-                {a.submitted_at ? new Date(a.submitted_at).toLocaleString() : "in progress"}
+                Started: {new Date(a.started_at).toLocaleString()}
+                {a.submitted_at && ` • Submitted: ${new Date(a.submitted_at).toLocaleString()}`}
               </div>
             </button>
           ))}
@@ -139,7 +163,7 @@ export default function AdminResults() {
 
       {selected && (
         <Card>
-          <CardHeader title={`Answers — ${selected.name || selected.email}`} />
+          <CardHeader title={`Answers — ${selected.name || selected.email || "Anonymous"}`} />
           <CardBody className="space-y-3">
             {rows.map((r, i) => (
               <div key={r.id} className="rounded-lg border p-3">
