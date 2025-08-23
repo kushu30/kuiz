@@ -8,6 +8,8 @@ import Textarea from "@/components/ui/Textarea";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import ShareModal from "@/components/ShareModal";
 import { testJoinLink } from "@/lib/share";
+import Dialog from "@/components/ui/Dialog";
+import { Trash2 } from "lucide-react";
 
 type DraftQ = {
   type: "mcq" | "text";
@@ -21,8 +23,8 @@ type DraftQ = {
 export default function AdminTestDetail(){
   const { id: testId } = useParams();
   const [qs, setQs] = useState<any[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // create question (manual)
   const [body, setBody] = useState("");
   const [type, setType] = useState<"mcq"|"text">("mcq");
   const [media, setMedia] = useState<File|null>(null);
@@ -32,7 +34,6 @@ export default function AdminTestDetail(){
   const [testMeta, setTestMeta] = useState<{title:string; code:string} | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
-  // AI
   const [topic, setTopic] = useState("");
   const [audience, setAudience] = useState("");
   const [count, setCount] = useState(5);
@@ -41,7 +42,6 @@ export default function AdminTestDetail(){
   const [busyGen, setBusyGen] = useState(false);
   const [err, setErr] = useState("");
 
-  // edit existing question
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
   const [editType, setEditType] = useState<"mcq"|"text">("mcq");
@@ -67,7 +67,6 @@ export default function AdminTestDetail(){
     })();
   }, [testId]);
 
-  // ---- Manual add
   async function addQuestion(e: React.FormEvent){
     e.preventDefault();
     let media_url: string | null = null;
@@ -94,7 +93,6 @@ export default function AdminTestDetail(){
     load();
   }
 
-  // ---- AI generate
   async function generateAI(){
     setBusyGen(true); setErr("");
     try {
@@ -125,7 +123,6 @@ export default function AdminTestDetail(){
     const toSave = drafts.filter(d => d.selected && d.body.trim().length > 0);
     if (!toSave.length) return;
 
-    // Insert sequentially to keep order_index correct
     for (const d of toSave) {
       const text_policy = d.type === "text" ? { accepted: [] } : null;
 
@@ -151,21 +148,18 @@ export default function AdminTestDetail(){
           }))
         );
       }
-      // update local order reference
       qs.push({ id: q?.id, body: d.body, type: d.type, media_url: null, order_index: qs.length+1, points: d.points ?? 1 });
     }
     setDrafts([]);
     await load();
   }
 
-  // ---- Edit existing
   async function startEdit(q: any){
     setEditingId(q.id);
     setEditBody(q.body);
     setEditType(q.type);
     setEditMedia(null);
     
-    // fetch text policy if text question
     if (q.type === "text") {
       const { data: qr } = await supabase.from("questions").select("text_policy").eq("id", q.id).single();
       setEditAccepted((qr?.text_policy?.accepted || []).join(", "));
@@ -173,7 +167,6 @@ export default function AdminTestDetail(){
       setEditAccepted("");
     }
     
-    // fetch options if mcq
     if (q.type === "mcq") {
       const { data: os } = await supabase.from("options")
         .select("label,text,is_correct").eq("question_id", q.id).order("label");
@@ -188,7 +181,7 @@ export default function AdminTestDetail(){
 
   async function saveEdit(){
     if (!editingId) return;
-    let media_url: string | null | undefined = undefined; // undefined = no change
+    let media_url: string | null | undefined = undefined;
     if (editMedia) {
       media_url = await uploadQuestionImage(editMedia);
     }
@@ -205,9 +198,7 @@ export default function AdminTestDetail(){
 
     await supabase.from("questions").update(update).eq("id", editingId);
 
-    // rewrite options if mcq
     if (editType === "mcq") {
-      // delete existing then insert
       await supabase.from("options").delete().eq("question_id", editingId);
       await supabase.from("options").insert(
         editOptions.map(o => ({
@@ -218,7 +209,6 @@ export default function AdminTestDetail(){
         }))
       );
     } else {
-      // delete any options for text type
       await supabase.from("options").delete().eq("question_id", editingId);
     }
 
@@ -227,7 +217,6 @@ export default function AdminTestDetail(){
     await load();
   }
 
-  // ---- Reorder
   async function move(id: string, dir: "up"|"down"){
     const idx = qs.findIndex(q => q.id === id);
     if (idx < 0) return;
@@ -235,7 +224,6 @@ export default function AdminTestDetail(){
     if (swapWith < 0 || swapWith >= qs.length) return;
 
     const A = qs[idx], B = qs[swapWith];
-    // swap order_index
     await Promise.all([
       supabase.from("questions").update({ order_index: B.order_index }).eq("id", A.id),
       supabase.from("questions").update({ order_index: A.order_index }).eq("id", B.id),
@@ -243,11 +231,15 @@ export default function AdminTestDetail(){
     await load();
   }
 
+  async function deleteQuestion(id: string) {
+    await supabase.from("questions").delete().eq("id", id);
+    load();
+  }
+
   return (
     <main className="space-y-6">
       <h1 className="text-xl font-semibold">Manage Questions</h1>
 
-      {/* AI generator */}
       <Card>
         <CardHeader title="Generate with AI" subtitle="Draft questions using Gemini Flash, then review & save." />
         <CardBody className="space-y-3">
@@ -272,7 +264,7 @@ export default function AdminTestDetail(){
               {busyGen ? "Generating…" : "Generate with AI"}
             </Button>
             {drafts.length > 0 && (
-              <Button onClick={saveSelectedDrafts} className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50">
+              <Button onClick={saveSelectedDrafts}>
                 Add selected ({drafts.filter(d=>d.selected).length})
               </Button>
             )}
@@ -329,7 +321,6 @@ export default function AdminTestDetail(){
         </CardBody>
       </Card>
 
-      {/* Manual add */}
       <Card>
         <CardHeader title="Add Question (manual)" />
         <CardBody className="grid gap-3 max-w-xl">
@@ -375,7 +366,6 @@ export default function AdminTestDetail(){
         </CardBody>
       </Card>
 
-      {/* Existing questions list */}
       <div className="grid gap-3">
         {qs.map(q=>(
           <Card key={q.id}>
@@ -386,6 +376,9 @@ export default function AdminTestDetail(){
                   <button className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50" onClick={()=>move(q.id,"up")}>↑</button>
                   <button className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50" onClick={()=>move(q.id,"down")}>↓</button>
                   <button className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50" onClick={()=>startEdit(q)}>Edit</button>
+                  <button className="p-2 rounded hover:bg-neutral-100" onClick={()=>setConfirmDeleteId(q.id)} title="Delete question">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
@@ -436,7 +429,6 @@ export default function AdminTestDetail(){
         {qs.length === 0 && <Card><CardBody>No questions yet.</CardBody></Card>}
       </div>
 
-      {/* Add the Done + Share controls */}
       {testMeta && (
         <div className="flex justify-between items-center mt-8 p-4 bg-neutral-50 rounded-lg">
           <div className="text-sm text-neutral-500">
@@ -444,17 +436,11 @@ export default function AdminTestDetail(){
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setShareOpen(true)}>Share</Button>
-            <Button
-              className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50"
-              onClick={() => (window.location.href = "/admin/tests")}
-            >
-              Done
-            </Button>
+            <Button onClick={() => (window.location.href = "/admin/tests")}>Done</Button>
           </div>
         </div>
       )}
 
-      {/* Add the Share Modal */}
       {testMeta && (
         <ShareModal
           open={shareOpen}
@@ -463,6 +449,19 @@ export default function AdminTestDetail(){
           link={testJoinLink(testMeta.code)}
         />
       )}
+
+      <Dialog
+        open={!!confirmDeleteId}
+        title="Delete question"
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) deleteQuestion(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        confirmLabel="Delete"
+      >
+        This action will remove the question and its options.
+      </Dialog>
     </main>
   );
 }

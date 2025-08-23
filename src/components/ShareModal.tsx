@@ -70,13 +70,13 @@ export default function ShareModal({
 
           <div className="flex gap-2">
             <Button onClick={whatsapp} className="flex-1">WhatsApp</Button>
-            <Button onClick={nativeShare} className="flex-1 bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50">
-              Share…
+            <Button onClick={nativeShare} className="flex-1">
+              Share
             </Button>
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={onClose} className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50">
+            <Button onClick={onClose} className="flex-1">
               Close
             </Button>
           </div>

@@ -4,11 +4,11 @@ import { supabase } from "@/lib/supabase";
 import Button from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { AnimatePresence, motion } from "framer-motion";
+import Dialog from "@/components/ui/Dialog";
 
-// Define ButtonProps to fix variant and onClick prop TypeScript errors
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: string; // Allow any string or specify allowed variants like "primary" | "secondary"
-  children: React.ReactNode; // Use ReactNode for flexibility
+  variant?: string;
+  children: React.ReactNode;
   className?: string;
   disabled?: boolean;
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void | Promise<void>;
@@ -42,19 +42,6 @@ function useQuery() {
   return new URLSearchParams(useLocation().search);
 }
 
-const pad = (n: number) => String(n).padStart(2, "0");
-
-function baseUrl() {
-  if (typeof window === "undefined") return "https://yourdomain.com";
-  return window.location.origin;
-}
-
-export function directStartLink(testId: string) {
-  const url = new URL(`/test/${testId}`, baseUrl());
-  url.searchParams.set("autostart", "1");
-  return url.toString();
-}
-
 export default function TakeTest() {
   const { id: testId } = useParams<{ id: string }>();
   const query = useQuery();
@@ -65,7 +52,7 @@ export default function TakeTest() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [options, setOptions] = useState<Option[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [showGuide, setShowGuide] = useState(true); // Start with guide shown
+  const [showGuide, setShowGuide] = useState(true);
   const [done, setDone] = useState<{
     show: boolean;
     score?: number;
@@ -73,13 +60,15 @@ export default function TakeTest() {
   }>({ show: false });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resultOpen, setResultOpen] = useState(false);
+  const [resultMsg, setResultMsg] = useState<string>("");
+  const [exitOpen, setExitOpen] = useState(false);
 
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [timeLeft, setTimeLeft] = useState<number>(0); // Initialize with 0
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   const timerRef = useRef<number | null>(null);
   const endKey = useMemo(() => (attemptId ? `kuiz_attempt_${attemptId}_end` : ""), [attemptId]);
 
-  // Timer logic (start after Start Quiz)
   useEffect(() => {
     if (!showGuide && timeLeft > 0) {
       const t = setInterval(() => setTimeLeft(t => t - 1), 1000);
@@ -143,12 +132,11 @@ export default function TakeTest() {
         setQuestions((qs || []) as Question[]);
         setOptions((os || []) as Option[]);
         
-        // Show guide if there are guidelines, otherwise start immediately
         if (t?.guidelines) {
           setShowGuide(true);
         } else {
           setShowGuide(false);
-          setTimeLeft(t.duration_minutes * 60); // Initialize timer
+          setTimeLeft(t.duration_minutes * 60);
         }
 
       } catch (err) {
@@ -194,6 +182,10 @@ export default function TakeTest() {
     }
   }
 
+  function tryExit() {
+    setExitOpen(true);
+  }
+
   function selectionsFromState() {
     return questions.map((q) => {
       const v = answers[q.id] ?? "";
@@ -205,42 +197,37 @@ export default function TakeTest() {
     });
   }
 
-  async function submitInternal() {
+  async function handleSubmit() {
+    setSubmitting(true);
     try {
       const selections = selectionsFromState();
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/.netlify/functions/grade`, {
+      const res = await fetch("/.netlify/functions/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ attemptId, testId, selections }),
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Submit failed (${res.status}). ${text || "Please try again."}`);
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text || "{}"); } catch {}
+
+      if (res.ok) {
+        const msg = data.showScore === true && typeof data.score === "number"
+          ? `Your score: ${data.score}`
+          : "Thanks for completing the quiz.";
+        setResultMsg(msg);
+        setResultOpen(true);
+        return;
       }
 
-      const data = await res.json().catch(() => ({}));
-      if (endKey) {
-        try {
-          localStorage.removeItem(endKey);
-        } catch {
-          console.warn("Failed to remove endKey from localStorage.");
-        }
-      }       
-          setDone({ show: true, score: typeof data.score === "number" ? data.score : undefined, willEmail: !!data.willEmail });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err: any) {
-      setError(err.message || "Failed to submit answers.");
-    }
-  }
-
-  async function handleSubmit() {
-    if (!confirm("Are you sure you want to submit your answers? You won't be able to change them afterward.")) {
-      return;
-    }
-    try {
-      setSubmitting(true);
-      await submitInternal();
+      const body = (data?.error || text || "").toLowerCase();
+      if (res.status === 400 && body.includes("already submitted")) {
+        setResultMsg("This attempt has already been submitted.");
+        setResultOpen(true);
+      } else {
+        setResultMsg("Submission failed. Please try again.");
+        setResultOpen(true);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -280,7 +267,6 @@ export default function TakeTest() {
     );
   }
 
-  // Render guide if showGuide is true
   if (showGuide) {
     return (
       <main className="max-w-xl mx-auto p-4">
@@ -295,7 +281,7 @@ export default function TakeTest() {
           <Button
             onClick={() => {
               setShowGuide(false);
-              setTimeLeft(test.duration_minutes * 60); // start timer here
+              setTimeLeft(test.duration_minutes * 60);
             }}
             className="shadow-lg"
           >
@@ -401,12 +387,8 @@ export default function TakeTest() {
       </AnimatePresence>
 
       <div className="sticky bottom-4 flex gap-2 justify-end">
-        <Button
-          onClick={endTestEarly}
-          className="shadow"
-          disabled={submitting}
-        >
-          End Test Early
+        <Button className="mr-2" onClick={tryExit} type="button">
+          End test
         </Button>
         <Button
           onClick={handleSubmit}
@@ -416,6 +398,26 @@ export default function TakeTest() {
           {submitting ? "Submitting..." : "Submit Answers"}
         </Button>
       </div>
+
+      <Dialog
+        open={resultOpen}
+        title="Submission"
+        onClose={() => { setResultOpen(false); navigate("/"); }}
+        onConfirm={() => { setResultOpen(false); navigate("/"); }}
+        confirmLabel="OK"
+      >
+        {resultMsg}
+      </Dialog>
+
+      <Dialog
+        open={exitOpen}
+        title="End test"
+        onClose={() => setExitOpen(false)}
+        onConfirm={() => { setExitOpen(false); navigate("/"); }}
+        confirmLabel="End"
+      >
+        Are you sure you want to end the test now?
+      </Dialog>
     </main>
   );
 }
