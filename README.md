@@ -1,5 +1,5 @@
 <div align="center">
-  <img width="500" height="500" alt="image" src="https://github.com/user-attachments/assets/169f5ff2-05cb-4269-8390-042b425e174e" />
+  <img width="200" height="200" alt="logo" src="https://github.com/user-attachments/assets/169f5ff2-05cb-4269-8390-042b425e174e" />
 
   
   # Kuiz
@@ -8,7 +8,7 @@
   
   Built with React, Vite, TailwindCSS, Supabase, and Netlify
   
-  [![Netlify Status](https://api.netlify.com/api/v1/badges/your-badge-id/deploy-status)](https://app.netlify.com/sites/your-site/deploys)
+  [![Click to open deployment](https://kuizit.netlify.app)]
   
 </div>
 
