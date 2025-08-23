@@ -7,6 +7,7 @@ import AdminTests from "./routes/admin/AdminTests";
 import AdminTestDetail from "./routes/admin/AdminTestDetail";
 import AdminResults from "./routes/admin/AdminResults";
 import RequireAuth from "./components/RequireAuth";
+import About from "./routes/About";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/join" element={<Join />} />
+        <Route path="/about" element={<About />} />
         <Route path="/test/:id" element={<TakeTest />} />
         <Route path="/take/:id" element={<TakeTest />} />
         <Route path="/admin/tests" element={<RequireAuth><AdminTests /></RequireAuth>} />
