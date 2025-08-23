@@ -84,22 +84,3 @@ npm run dev
 ```bash
 npm run build
 ```
-
-## Deployment
-
-1. **Connect to Netlify** - Link your GitHub repository
-2. **Build Settings** - Set build command: `npm run build` | Publish directory: `dist`
-3. **Environment Variables** - Add all required variables in Netlify settings
-4. **Deploy** - Automatic deployment on push
-
-## License
-
-MIT License - feel free to use this project for your own purposes.
-
----
-
-<div align="center">
-  
-**Built with ❤️ for seamless quiz experiences**
-
-</div>
