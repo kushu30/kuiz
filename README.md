@@ -8,7 +8,7 @@
   
   Built with React, Vite, TailwindCSS, Supabase, and Netlify
   
-  [![Click to open deployment](https://kuizit.netlify.app)]
+[![Click to open deployment](https://img.shields.io/badge/Live%20Demo-Click%20Here-brightgreen?style=for-the-badge)](https://kuizit.netlify.app)
   
 </div>
 
