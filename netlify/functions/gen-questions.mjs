@@ -12,7 +12,7 @@ export const handler = async (event) => {
     return { statusCode: 500, body: "Missing GEMINI_API_KEY in environment" };
   }
 
-  const model = "gemini-2.0-flash"; // default
+  const model = "gemini-2.5-flash"; // default
 
   const sys = `You generate exam questions. Output STRICT JSON only, matching this schema:
 {
