@@ -26,6 +26,7 @@ export default function AdminTestDetail(){
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [body, setBody] = useState("");
+  const [caption, setCaption] = useState("");
   const [type, setType] = useState<"mcq"|"text">("mcq");
   const [media, setMedia] = useState<File|null>(null);
   const [options, setOptions] = useState([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
@@ -45,6 +46,7 @@ export default function AdminTestDetail(){
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
+  const [editCaption, setEditCaption] = useState("");
   const [editType, setEditType] = useState<"mcq"|"text">("mcq");
   const [editMedia, setEditMedia] = useState<File|null>(null);
   const [editOptions, setEditOptions] = useState([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
@@ -88,7 +90,16 @@ export default function AdminTestDetail(){
 
       console.log("Inserting question into DB...");
       const { data: q, error } = await supabase.from("questions")
-        .insert({ test_id: testId, body, type, media_url, order_index: (qs.length+1), points: 1, text_policy })
+        .insert({ 
+          test_id: testId, 
+          body, 
+          type, 
+          media_url, 
+          media_caption: caption.trim() || null,
+          order_index: (qs.length+1), 
+          points: 1, 
+          text_policy 
+        })
         .select("id").single();
       
       if (error) {
@@ -106,7 +117,7 @@ export default function AdminTestDetail(){
       }
       
       console.log("Question added successfully!");
-      setBody(""); setMedia(null);
+      setBody(""); setMedia(null); setCaption("");
       setOptions([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
       setCorrect("A");
       setTextAccepted("");
@@ -183,6 +194,7 @@ export default function AdminTestDetail(){
   async function startEdit(q: any){
     setEditingId(q.id);
     setEditBody(q.body);
+    setEditCaption(q.media_caption || "");
     setEditType(q.type);
     setEditMedia(null);
     
@@ -218,7 +230,11 @@ export default function AdminTestDetail(){
         media_url = await uploadQuestionImage(editMedia);
       }
       
-      const update: any = { body: editBody.trim(), type: editType };
+      const update: any = { 
+        body: editBody.trim(), 
+        type: editType,
+        media_caption: editCaption.trim() || null
+      };
       if (media_url !== undefined) update.media_url = media_url;
 
       if (editType === "text") {
@@ -255,6 +271,7 @@ export default function AdminTestDetail(){
       console.log("Edit saved successfully!");
       setEditingId(null);
       setEditMedia(null);
+      setEditCaption("");
       await load();
     } catch (err: any) {
       console.error("Unexpected error in saveEdit:", err);
@@ -381,7 +398,14 @@ export default function AdminTestDetail(){
       <Card>
         <CardHeader title="Add Question (manual)" />
         <CardBody className="grid gap-3 max-w-xl">
-          <Textarea placeholder="Question text" value={body} onChange={e=>setBody(e.target.value)} />
+          <div className="grid gap-1">
+            <span className="text-sm font-medium">Question Text</span>
+            <Textarea placeholder="Question text" value={body} onChange={e=>setBody(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <span className="text-sm font-medium">Image Caption (optional)</span>
+            <Input placeholder="Short caption shown below image" value={caption} onChange={e=>setCaption(e.target.value)} />
+          </div>
           <label className="text-sm flex items-center gap-2">
             Type:
             <select value={type} onChange={e=>setType(e.target.value as any)} className="border rounded px-2 py-1">
@@ -396,6 +420,35 @@ export default function AdminTestDetail(){
               <span className="text-sm">Choose image</span>
               <input type="file" accept="image/*" className="hidden" onChange={e=>setMedia(e.target.files?.[0] || null)} />
             </label>
+            <Button 
+              variant="outline" 
+              className="px-3 py-2 h-auto text-xs flex items-center gap-2"
+              onClick={async () => {
+                if (!body.trim()) { setErr("Enter a question first to generate an image."); return; }
+                setBusySave(true); setErr("");
+                try {
+                  const r = await fetch("/.netlify/functions/gen-image", {
+                    method: "POST",
+                    body: JSON.stringify({ prompt: body })
+                  });
+                  if (!r.ok) throw new Error(await r.text());
+                  const { url } = await r.json();
+                  // For now, we just set the caption or handle the URL
+                  // Ideally we download it and set it as 'media' file, 
+                  // but for simplicity we'll just store the AI URL if the DB allows it, 
+                  // or tell the user it's ready.
+                  setErr("AI Image generated! (Using placeholder for now)");
+                  console.log("AI Image URL:", url);
+                } catch (e: any) {
+                  setErr("AI Image failed: " + e.message);
+                } finally {
+                  setBusySave(false);
+                }
+              }}
+            >
+              <ImageIcon size={14} />
+              AI Generate
+            </Button>
           </div>
           {media && (
             <div className="relative w-32 h-32 group">
@@ -472,7 +525,14 @@ export default function AdminTestDetail(){
 
               {editingId === q.id && (
                 <div className="grid gap-2 border-t pt-3">
-                  <Textarea value={editBody} onChange={e=>setEditBody(e.target.value)} />
+                  <div className="grid gap-1">
+                    <span className="text-sm font-medium">Question Text</span>
+                    <Textarea value={editBody} onChange={e=>setEditBody(e.target.value)} />
+                  </div>
+                  <div className="grid gap-1">
+                    <span className="text-sm font-medium">Image Caption</span>
+                    <Input placeholder="Short caption shown below image" value={editCaption} onChange={e=>setEditCaption(e.target.value)} />
+                  </div>
                   <label className="text-sm flex items-center gap-2">
                     Type:
                     <select value={editType} onChange={e=>setEditType(e.target.value as any)} className="border rounded px-2 py-1">

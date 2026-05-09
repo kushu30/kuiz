@@ -18,7 +18,7 @@ type Option = { id: string; question_id: string; label: string; text: string; is
 type Row = {
   id: string;
   is_correct: boolean | null;
-  question: { id: string; body: string; type: "mcq" | "text"; media_url?: string | null };
+  question: { id: string; body: string; type: "mcq" | "text"; media_url?: string | null; media_caption?: string | null };
   option?: { label: string; text: string } | null;
   text_input?: string | null;
   correct_option?: { label: string; text: string } | null;
@@ -89,7 +89,7 @@ export default function AdminResults() {
         option_id,
         text_input,
         is_correct,
-        question:questions(id, body, type, text_policy, media_url),
+        question:questions(id, body, type, text_policy, media_url, media_caption),
         option:options(id, label, text, is_correct)
       `)
       .eq("attempt_id", a.id);
@@ -162,6 +162,7 @@ export default function AdminResults() {
           body: question?.body || "Unknown question",
           type: (question?.type as "mcq" | "text") || "mcq",
           media_url: question?.media_url || null,
+          media_caption: question?.media_caption || null,
         },
         option:
           answer.option_id && answer.option
@@ -217,11 +218,18 @@ export default function AdminResults() {
                   {i + 1}. {r.question.body}
                 </div>
                 {r.question.media_url && (
-                  <img 
-                    src={r.question.media_url} 
-                    className="w-24 h-24 object-cover rounded border my-2" 
-                    alt="Question" 
-                  />
+                  <div className="flex flex-col items-center w-fit">
+                    <img 
+                      src={r.question.media_url} 
+                      className="w-24 h-24 object-cover rounded border my-2" 
+                      alt="Question" 
+                    />
+                    {r.question.media_caption && (
+                      <div className="text-[10px] text-neutral-400 italic -mt-1 mb-2">
+                        {r.question.media_caption}
+                      </div>
+                    )}
+                  </div>
                 )}
                 {r.question.type === "mcq" ? (
                   <>

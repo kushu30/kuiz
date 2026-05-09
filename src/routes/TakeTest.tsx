@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { AnimatePresence, motion } from "framer-motion";
 import Dialog from "@/components/ui/Dialog";
+import { Image as ImageIcon } from "lucide-react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: string;
@@ -335,17 +336,32 @@ export default function TakeTest() {
               <CardBody className="space-y-3">
                 <div className="font-medium">{i + 1}. {q.body}</div>
                 {q.media_url && (
-                  <div className="relative w-full overflow-hidden rounded-lg border bg-neutral-50 min-h-[100px] flex items-center justify-center">
+                  <div className="relative w-full overflow-hidden rounded-lg border bg-neutral-50 min-h-[120px] flex flex-col items-center justify-center gap-2 group">
                     <img
                       src={q.media_url}
-                      className="max-w-full max-h-80 object-contain"
-                      alt={`Question illustration`}
+                      className="max-w-full max-h-80 object-contain z-10"
+                      alt={q.body}
                       loading="lazy"
                       onError={(e) => {
                         console.error("Image failed to load:", q.media_url);
                         e.currentTarget.style.display = 'none';
+                        // Show fallback text
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const fallback = parent.querySelector('.img-fallback');
+                          if (fallback) fallback.classList.remove('hidden');
+                        }
                       }}
                     />
+                    <div className="img-fallback hidden flex flex-col items-center text-neutral-400">
+                      <ImageIcon size={24} />
+                      <span className="text-xs mt-1">Image not available</span>
+                    </div>
+                  </div>
+                )}
+                {q.media_caption && (
+                  <div className="text-xs text-neutral-500 italic text-center mt-1">
+                    {q.media_caption}
                   </div>
                 )}
 
