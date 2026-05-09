@@ -40,6 +40,7 @@ export default function AdminTestDetail(){
   const [mix, setMix] = useState<"mcq_text"|"mcq_only"|"text_only">("mcq_text");
   const [drafts, setDrafts] = useState<DraftQ[]>([]);
   const [busyGen, setBusyGen] = useState(false);
+  const [busySave, setBusySave] = useState(false);
   const [err, setErr] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -69,6 +70,8 @@ export default function AdminTestDetail(){
 
   async function addQuestion(e: React.FormEvent){
     e.preventDefault();
+    if (busySave) return;
+    setBusySave(true);
     setErr("");
     console.log("addQuestion started...");
     
@@ -111,6 +114,8 @@ export default function AdminTestDetail(){
     } catch (err: any) {
       console.error("Unexpected error in addQuestion:", err);
       setErr(err?.message || "An unexpected error occurred");
+    } finally {
+      setBusySave(false);
     }
   }
 
@@ -201,7 +206,8 @@ export default function AdminTestDetail(){
   }
 
   async function saveEdit(){
-    if (!editingId) return;
+    if (!editingId || busySave) return;
+    setBusySave(true);
     setErr("");
     console.log("saveEdit started for ID:", editingId);
     
@@ -253,6 +259,8 @@ export default function AdminTestDetail(){
     } catch (err: any) {
       console.error("Unexpected error in saveEdit:", err);
       setErr(err?.message || "An unexpected error occurred");
+    } finally {
+      setBusySave(false);
     }
   }
 
@@ -427,8 +435,10 @@ export default function AdminTestDetail(){
               <div className="text-xs text-neutral-500">Case-insensitive; we compare normalized text.</div>
             </div>
           )}
-          <Button onClick={addQuestion}>Add Question</Button>
-          {err && <div className="text-sm text-red-600">{err}</div>}
+          <Button onClick={addQuestion} disabled={busySave}>
+            {busySave ? "Adding..." : "Add Question"}
+          </Button>
+          {err && <div className="text-sm text-red-600 font-medium bg-red-50 p-2 rounded">{err}</div>}
         </CardBody>
       </Card>
 
@@ -522,8 +532,10 @@ export default function AdminTestDetail(){
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Button onClick={saveEdit}>Save</Button>
-                    <Button className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50" onClick={()=>setEditingId(null)}>Cancel</Button>
+                    <Button onClick={saveEdit} disabled={busySave}>
+                      {busySave ? "Saving..." : "Save"}
+                    </Button>
+                    <Button className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50" onClick={()=>setEditingId(null)} disabled={busySave}>Cancel</Button>
                   </div>
                 </div>
               )}
