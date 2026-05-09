@@ -335,12 +335,18 @@ export default function TakeTest() {
               <CardBody className="space-y-3">
                 <div className="font-medium">{i + 1}. {q.body}</div>
                 {q.media_url && (
-                  <img
-                    src={q.media_url}
-                    className="w-full max-h-64 object-contain rounded-lg border"
-                    alt={`Media for question ${i + 1}`}
-                    loading="lazy"
-                  />
+                  <div className="relative w-full overflow-hidden rounded-lg border bg-neutral-50 min-h-[100px] flex items-center justify-center">
+                    <img
+                      src={q.media_url}
+                      className="max-w-full max-h-80 object-contain"
+                      alt={`Question illustration`}
+                      loading="lazy"
+                      onError={(e) => {
+                        console.error("Image failed to load:", q.media_url);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
                 )}
 
                 {q.type === "mcq" ? (
