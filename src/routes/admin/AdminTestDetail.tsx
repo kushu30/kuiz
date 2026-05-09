@@ -9,7 +9,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import ShareModal from "@/components/ShareModal";
 import { testJoinLink } from "@/lib/share";
 import Dialog from "@/components/ui/Dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon } from "lucide-react";
 
 type DraftQ = {
   type: "mcq" | "text";
@@ -69,28 +69,49 @@ export default function AdminTestDetail(){
 
   async function addQuestion(e: React.FormEvent){
     e.preventDefault();
-    let media_url: string | null = null;
-    if (media) media_url = await uploadQuestionImage(media);
+    setErr("");
+    console.log("addQuestion started...");
+    
+    try {
+      let media_url: string | null = null;
+      if (media) {
+        console.log("Uploading question image...");
+        media_url = await uploadQuestionImage(media);
+      }
 
-    const text_policy = type === "text"
-      ? { accepted: textAccepted.split(",").map(s=> s.trim()).filter(Boolean) }
-      : null;
+      const text_policy = type === "text"
+        ? { accepted: textAccepted.split(",").map(s=> s.trim()).filter(Boolean) }
+        : null;
 
-    const { data: q, error } = await supabase.from("questions")
-      .insert({ test_id: testId, body, type, media_url, order_index: (qs.length+1), points: 1, text_policy })
-      .select("id").single();
-    if (error) { setErr(error.message); return; }
+      console.log("Inserting question into DB...");
+      const { data: q, error } = await supabase.from("questions")
+        .insert({ test_id: testId, body, type, media_url, order_index: (qs.length+1), points: 1, text_policy })
+        .select("id").single();
+      
+      if (error) {
+        console.error("DB Insert Error:", error);
+        setErr(error.message); 
+        return; 
+      }
 
-    if (type === "mcq" && q) {
-      await supabase.from("options").insert(
-        options.map(o => ({ question_id: q.id, label: o.label, text: o.text, is_correct: o.label === correct }))
-      );
+      if (type === "mcq" && q) {
+        console.log("Inserting MCQ options...");
+        const { error: optErr } = await supabase.from("options").insert(
+          options.map(o => ({ question_id: q.id, label: o.label, text: o.text, is_correct: o.label === correct }))
+        );
+        if (optErr) console.error("Options insert error:", optErr);
+      }
+      
+      console.log("Question added successfully!");
+      setBody(""); setMedia(null);
+      setOptions([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
+      setCorrect("A");
+      setTextAccepted("");
+      load();
+    } catch (err: any) {
+      console.error("Unexpected error in addQuestion:", err);
+      setErr(err?.message || "An unexpected error occurred");
     }
-    setBody(""); setMedia(null);
-    setOptions([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
-    setCorrect("A");
-    setTextAccepted("");
-    load();
   }
 
   async function generateAI(){
@@ -181,40 +202,58 @@ export default function AdminTestDetail(){
 
   async function saveEdit(){
     if (!editingId) return;
-    let media_url: string | null | undefined = undefined;
-    if (editMedia) {
-      media_url = await uploadQuestionImage(editMedia);
+    setErr("");
+    console.log("saveEdit started for ID:", editingId);
+    
+    try {
+      let media_url: string | null | undefined = undefined;
+      if (editMedia) {
+        console.log("Uploading replacement image...");
+        media_url = await uploadQuestionImage(editMedia);
+      }
+      
+      const update: any = { body: editBody.trim(), type: editType };
+      if (media_url !== undefined) update.media_url = media_url;
+
+      if (editType === "text") {
+        update.text_policy = {
+          accepted: editAccepted.split(",").map(s=> s.trim()).filter(Boolean)
+        };
+      } else {
+        update.text_policy = null;
+      }
+
+      console.log("Updating question in DB...");
+      const { error: updError } = await supabase.from("questions").update(update).eq("id", editingId);
+      if (updError) {
+        console.error("DB Update Error:", updError);
+        setErr(updError.message);
+        return;
+      }
+
+      if (editType === "mcq") {
+        console.log("Updating MCQ options...");
+        await supabase.from("options").delete().eq("question_id", editingId);
+        await supabase.from("options").insert(
+          editOptions.map(o => ({
+            question_id: editingId,
+            label: o.label,
+            text: o.text,
+            is_correct: o.label === editCorrect
+          }))
+        );
+      } else {
+        await supabase.from("options").delete().eq("question_id", editingId);
+      }
+
+      console.log("Edit saved successfully!");
+      setEditingId(null);
+      setEditMedia(null);
+      await load();
+    } catch (err: any) {
+      console.error("Unexpected error in saveEdit:", err);
+      setErr(err?.message || "An unexpected error occurred");
     }
-    const update: any = { body: editBody.trim(), type: editType };
-    if (media_url !== undefined) update.media_url = media_url;
-
-    if (editType === "text") {
-      update.text_policy = {
-        accepted: editAccepted.split(",").map(s=> s.trim()).filter(Boolean)
-      };
-    } else {
-      update.text_policy = null;
-    }
-
-    await supabase.from("questions").update(update).eq("id", editingId);
-
-    if (editType === "mcq") {
-      await supabase.from("options").delete().eq("question_id", editingId);
-      await supabase.from("options").insert(
-        editOptions.map(o => ({
-          question_id: editingId,
-          label: o.label,
-          text: o.text,
-          is_correct: o.label === editCorrect
-        }))
-      );
-    } else {
-      await supabase.from("options").delete().eq("question_id", editingId);
-    }
-
-    setEditingId(null);
-    setEditMedia(null);
-    await load();
   }
 
   async function move(id: string, dir: "up"|"down"){
@@ -342,15 +381,21 @@ export default function AdminTestDetail(){
               <option value="text">Text input</option>
             </select>
           </label>
-          <label className="text-sm">
-            Image (optional): <input type="file" accept="image/*" onChange={e=>setMedia(e.target.files?.[0] || null)} />
-          </label>
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Image (optional)</span>
+            <label className="flex items-center gap-2 px-3 py-2 border rounded cursor-pointer hover:bg-neutral-50 transition-colors w-fit">
+              <Upload size={16} className="text-neutral-500" />
+              <span className="text-sm">Choose image</span>
+              <input type="file" accept="image/*" className="hidden" onChange={e=>setMedia(e.target.files?.[0] || null)} />
+            </label>
+          </div>
           {media && (
-            <div className="relative w-32 h-32">
+            <div className="relative w-32 h-32 group">
               <img src={URL.createObjectURL(media)} className="w-full h-full object-cover rounded border" alt="Preview" />
               <button 
                 onClick={() => setMedia(null)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-transform hover:scale-110"
+                title="Remove image"
               >
                 <Trash2 size={12} />
               </button>
@@ -425,10 +470,14 @@ export default function AdminTestDetail(){
                       <option value="text">Text input</option>
                     </select>
                   </label>
-                  <label className="text-sm">
-                    {q.media_url ? "Change Image:" : "Add Image:"} 
-                    <input type="file" accept="image/*" onChange={e=>setEditMedia(e.target.files?.[0] || null)} />
-                  </label>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">Question Image</span>
+                    <label className="flex items-center gap-2 px-3 py-1.5 border rounded cursor-pointer hover:bg-neutral-50 transition-colors w-fit">
+                      <Upload size={14} className="text-neutral-500" />
+                      <span className="text-sm">{q.media_url ? "Change image" : "Add image"}</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={e=>setEditMedia(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
                   
                   <div className="flex gap-4 items-center">
                     {q.media_url && !editMedia && (
@@ -438,11 +487,11 @@ export default function AdminTestDetail(){
                       </div>
                     )}
                     {editMedia && (
-                      <div className="relative w-24 h-24">
+                      <div className="relative w-24 h-24 group">
                         <img src={URL.createObjectURL(editMedia)} className="w-full h-full object-cover rounded border" alt="New Preview" />
                         <button 
                           onClick={() => setEditMedia(null)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-transform hover:scale-110"
                         >
                           <Trash2 size={10} />
                         </button>
