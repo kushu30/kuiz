@@ -36,7 +36,7 @@ export default function AdminTestDetail(){
 
   const [topic, setTopic] = useState("");
   const [audience, setAudience] = useState("");
-  const [count, setCount] = useState(5);
+  const [count, setCount] = useState<number | "">(5);
   const [mix, setMix] = useState<"mcq_text"|"mcq_only"|"text_only">("mcq_text");
   const [drafts, setDrafts] = useState<DraftQ[]>([]);
   const [busyGen, setBusyGen] = useState(false);
@@ -246,7 +246,17 @@ export default function AdminTestDetail(){
           <div className="grid gap-2 sm:grid-cols-3">
             <Input placeholder="Topic (e.g., Basic SQL Joins)" value={topic} onChange={e=>setTopic(e.target.value)} />
             <Input placeholder="Intended audience (e.g., 1st-year CS)" value={audience} onChange={e=>setAudience(e.target.value)} />
-            <Input type="number" min={1} max={20} placeholder="Count" value={count} onChange={e=>setCount(parseInt(e.target.value||"0"))} />
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              placeholder="Count"
+              value={count}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCount(val === "" ? "" : parseInt(val));
+              }}
+            />
           </div>
           <div className="flex gap-3 text-sm">
             <label className="flex items-center gap-2">

@@ -15,7 +15,7 @@ export default function AdminTests() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [guidelines, setGuidelines] = useState("");
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState<number | "">("");
   const [showScore, setShowScore] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function AdminTests() {
       title,
       description: description.trim() || null,
       guidelines: guidelines.trim() || null,
-      duration_minutes: duration,
+      duration_minutes: duration || 30,
       show_score: showScore,
       is_public: true,
       code,
@@ -54,7 +54,7 @@ export default function AdminTests() {
       setTitle(""); 
       setDescription("");
       setGuidelines("");
-      setDuration(30); 
+      setDuration(""); 
       setShowScore(true);
       load();
     }
@@ -98,7 +98,10 @@ export default function AdminTests() {
           className="border rounded px-3 py-2"
           placeholder="Duration (min)"
           value={duration}
-          onChange={(e) => setDuration(parseInt(e.target.value || "0"))}
+          onChange={(e) => {
+            const val = e.target.value;
+            setDuration(val === "" ? "" : parseInt(val));
+          }}
           min={1}
         />
         <label className="flex items-center gap-2 text-sm">
