@@ -18,7 +18,7 @@ type Option = { id: string; question_id: string; label: string; text: string; is
 type Row = {
   id: string;
   is_correct: boolean | null;
-  question: { id: string; body: string; type: "mcq" | "text" };
+  question: { id: string; body: string; type: "mcq" | "text"; media_url?: string | null };
   option?: { label: string; text: string } | null;
   text_input?: string | null;
   correct_option?: { label: string; text: string } | null;
@@ -89,7 +89,7 @@ export default function AdminResults() {
         option_id,
         text_input,
         is_correct,
-        question:questions(id, body, type, text_policy),
+        question:questions(id, body, type, text_policy, media_url),
         option:options(id, label, text, is_correct)
       `)
       .eq("attempt_id", a.id);
@@ -161,6 +161,7 @@ export default function AdminResults() {
           id: question?.id || answer.question_id,
           body: question?.body || "Unknown question",
           type: (question?.type as "mcq" | "text") || "mcq",
+          media_url: question?.media_url || null,
         },
         option:
           answer.option_id && answer.option
@@ -215,6 +216,13 @@ export default function AdminResults() {
                 <div className="font-medium">
                   {i + 1}. {r.question.body}
                 </div>
+                {r.question.media_url && (
+                  <img 
+                    src={r.question.media_url} 
+                    className="w-24 h-24 object-cover rounded border my-2" 
+                    alt="Question" 
+                  />
+                )}
                 {r.question.type === "mcq" ? (
                   <>
                     <div className="text-sm mt-1">

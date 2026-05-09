@@ -345,6 +345,17 @@ export default function AdminTestDetail(){
           <label className="text-sm">
             Image (optional): <input type="file" accept="image/*" onChange={e=>setMedia(e.target.files?.[0] || null)} />
           </label>
+          {media && (
+            <div className="relative w-32 h-32">
+              <img src={URL.createObjectURL(media)} className="w-full h-full object-cover rounded border" alt="Preview" />
+              <button 
+                onClick={() => setMedia(null)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )}
           {type==="mcq" && (
             <div className="grid gap-2">
               {options.map((o,i)=>(
@@ -380,8 +391,20 @@ export default function AdminTestDetail(){
         {qs.map(q=>(
           <Card key={q.id}>
             <CardBody className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{q.order_index}. {q.body} <span className="text-xs text-neutral-500">({q.type})</span></div>
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-2">
+                  <div className="font-medium">
+                    {q.order_index}. {q.body} 
+                    <span className="ml-2 text-xs text-neutral-500 italic">({q.type})</span>
+                  </div>
+                  {q.media_url && (
+                    <img 
+                      src={q.media_url} 
+                      className="w-32 h-32 object-cover rounded border shadow-sm" 
+                      alt="Question media" 
+                    />
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50" onClick={()=>move(q.id,"up")}>↑</button>
                   <button className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50" onClick={()=>move(q.id,"down")}>↓</button>
@@ -403,8 +426,30 @@ export default function AdminTestDetail(){
                     </select>
                   </label>
                   <label className="text-sm">
-                    Replace/Add Image: <input type="file" accept="image/*" onChange={e=>setEditMedia(e.target.files?.[0] || null)} />
+                    {q.media_url ? "Change Image:" : "Add Image:"} 
+                    <input type="file" accept="image/*" onChange={e=>setEditMedia(e.target.files?.[0] || null)} />
                   </label>
+                  
+                  <div className="flex gap-4 items-center">
+                    {q.media_url && !editMedia && (
+                      <div className="relative w-24 h-24">
+                        <img src={q.media_url} className="w-full h-full object-cover rounded border opacity-70" alt="Current" />
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-neutral-600 bg-white/20">CURRENT</div>
+                      </div>
+                    )}
+                    {editMedia && (
+                      <div className="relative w-24 h-24">
+                        <img src={URL.createObjectURL(editMedia)} className="w-full h-full object-cover rounded border" alt="New Preview" />
+                        <button 
+                          onClick={() => setEditMedia(null)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                        <div className="absolute inset-x-0 bottom-0 text-[10px] text-center bg-blue-500 text-white font-bold py-0.5">NEW</div>
+                      </div>
+                    )}
+                  </div>
                   {editType==="mcq" && (
                     <div className="grid gap-2">
                       {editOptions.map((o,i)=>(
