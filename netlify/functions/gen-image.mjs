@@ -14,10 +14,9 @@ export const handler = async (event) => {
       return { statusCode:400, body: "Missing prompt" };
     }
 
-    // Using Pollinations.ai for immediate "wow" factor
-    // It's free, requires no API key, and is extremely fast.
+    // Using Flux via Pollinations for ultra-high quality "buttery smooth" images
     const seed = Math.floor(Math.random() * 1000000);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=1024&height=1024&nologo=true`;
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=1024&height=1024&nologo=true&model=flux`;
 
     return {
       statusCode: 200,

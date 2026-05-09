@@ -40,9 +40,25 @@ export default function AdminTestDetail(){
   const [count, setCount] = useState<number | "">(5);
   const [mix, setMix] = useState<"mcq_text"|"mcq_only"|"text_only">("mcq_text");
   const [drafts, setDrafts] = useState<DraftQ[]>([]);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [busyGen, setBusyGen] = useState(false);
   const [busySave, setBusySave] = useState(false);
   const [err, setErr] = useState("");
+
+  // Helper to fetch AI image as a File object so it can be previewed/uploaded
+  async function fetchAIImage(prompt: string) {
+    const r = await fetch("/.netlify/functions/gen-image", {
+      method: "POST",
+      body: JSON.stringify({ prompt })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const { url } = await r.json();
+    
+    // Fetch the actual image data
+    const imgRes = await fetch(url);
+    const blob = await imgRes.blob();
+    return new File([blob], `ai-gen-${Date.now()}.jpg`, { type: "image/jpeg" });
+  }
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
@@ -423,23 +439,17 @@ export default function AdminTestDetail(){
             <Button 
               variant="outline" 
               className="px-3 py-2 h-auto text-xs flex items-center gap-2"
-              onClick={async () => {
+              onClick={async (e) => {
+                e.preventDefault();
                 if (!body.trim()) { setErr("Enter a question first to generate an image."); return; }
                 setBusySave(true); setErr("");
                 try {
-                  const r = await fetch("/.netlify/functions/gen-image", {
-                    method: "POST",
-                    body: JSON.stringify({ prompt: body })
-                  });
-                  if (!r.ok) throw new Error(await r.text());
-                  const { url } = await r.json();
-                  // For now, we just set the caption or handle the URL
-                  // Ideally we download it and set it as 'media' file, 
-                  // but for simplicity we'll just store the AI URL if the DB allows it, 
-                  // or tell the user it's ready.
-                  setErr("AI Image generated! (Using placeholder for now)");
-                  console.log("AI Image URL:", url);
+                  console.log("Generating AI image for prompt:", body);
+                  const file = await fetchAIImage(body);
+                  setMedia(file);
+                  console.log("AI Image generated and set as preview.");
                 } catch (e: any) {
+                  console.error("AI Gen Error:", e);
                   setErr("AI Image failed: " + e.message);
                 } finally {
                   setBusySave(false);
@@ -547,6 +557,29 @@ export default function AdminTestDetail(){
                       <span className="text-sm">{q.media_url ? "Change image" : "Add image"}</span>
                       <input type="file" accept="image/*" className="hidden" onChange={e=>setEditMedia(e.target.files?.[0] || null)} />
                     </label>
+                    <Button 
+                      variant="outline" 
+                      className="px-3 py-1.5 h-auto text-xs flex items-center gap-2"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        if (!editBody.trim()) { setErr("Enter question text to generate an image."); return; }
+                        setBusySave(true); setErr("");
+                        try {
+                          console.log("Generating AI image for edit-prompt:", editBody);
+                          const file = await fetchAIImage(editBody);
+                          setEditMedia(file);
+                          console.log("AI Image generated and set as edit-preview.");
+                        } catch (e: any) {
+                          console.error("AI Gen Error (Edit):", e);
+                          setErr("AI Image failed: " + e.message);
+                        } finally {
+                          setBusySave(false);
+                        }
+                      }}
+                    >
+                      <ImageIcon size={14} />
+                      AI Generate
+                    </Button>
                   </div>
                   
                   <div className="flex gap-4 items-center">
