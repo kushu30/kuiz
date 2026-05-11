@@ -37,6 +37,7 @@ interface Test {
   guidelines: string | null;
   show_score: boolean;
   duration_minutes: number;
+  scoring_policy: any;
 }
 
 function useQuery() {
@@ -101,7 +102,7 @@ export default function TakeTest() {
 
         const { data: t, error: et } = await supabase
           .from("tests")
-          .select("id,title,description,guidelines,show_score,duration_minutes")
+          .select("id,title,description,guidelines,show_score,duration_minutes,scoring_policy")
           .eq("id", testId)
           .single();
         if (et || !t) {
@@ -299,8 +300,15 @@ export default function TakeTest() {
         <div>
           <h1 className="text-xl font-semibold">{test.title}</h1>
           <div className="text-xs text-neutral-500">{test.description || "No description provided."}</div>
-          <div className="text-xs text-neutral-500">
-            {total} questions • {test.duration_minutes} min
+          <div className="flex gap-3 mt-1">
+            <div className="text-xs text-neutral-500">
+              {total} questions • {test.duration_minutes} min
+            </div>
+            {test.scoring_policy?.mcq && (
+              <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 rounded">
+                Scoring: +{test.scoring_policy.mcq.correct} / {test.scoring_policy.mcq.negative}
+              </div>
+            )}
           </div>
         </div>
         <div className="text-xs text-neutral-500">

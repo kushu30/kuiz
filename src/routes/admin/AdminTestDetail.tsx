@@ -9,16 +9,18 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import ShareModal from "@/components/ShareModal";
 import { testJoinLink } from "@/lib/share";
 import Dialog from "@/components/ui/Dialog";
-import { Trash2, Upload, Image as ImageIcon } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Plus, Minus, Settings2 } from "lucide-react";
 
 type DraftQ = {
   type: "mcq" | "text";
   body: string;
-  options: { label: "A"|"B"|"C"|"D"; text: string }[] | null;
-  correct_label: "A"|"B"|"C"|"D" | null;
+  options: { label: string; text: string }[] | null;
+  correct_label: string | null;
   points: number;
   selected?: boolean;
 };
+
+const getLabel = (i: number) => String.fromCharCode(65 + i);
 
 export default function AdminTestDetail(){
   const { id: testId } = useParams();
@@ -32,7 +34,7 @@ export default function AdminTestDetail(){
   const [options, setOptions] = useState([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
   const [correct, setCorrect] = useState("A");
   const [textAccepted, setTextAccepted] = useState<string>("");
-  const [testMeta, setTestMeta] = useState<{title:string; code:string} | null>(null);
+  const [testMeta, setTestMeta] = useState<{title:string; code:string; scoring_policy?: any} | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
   const [topic, setTopic] = useState("");
@@ -80,7 +82,7 @@ export default function AdminTestDetail(){
 
   useEffect(() => {
     (async () => {
-      const { data: t } = await supabase.from("tests").select("title,code").eq("id", testId).single();
+      const { data: t } = await supabase.from("tests").select("title,code,scoring_policy").eq("id", testId).single();
       if (t) setTestMeta(t);
       await load();
     })();
@@ -224,9 +226,13 @@ export default function AdminTestDetail(){
     if (q.type === "mcq") {
       const { data: os } = await supabase.from("options")
         .select("label,text,is_correct").eq("question_id", q.id).order("label");
-      const arr = ["A","B","C","D"].map((L)=> ({label: L as "A"|"B"|"C"|"D", text: os?.find(o=>o.label===L)?.text || ""}));
-      setEditOptions(arr);
-      setEditCorrect((os?.find(o=>o.is_correct)?.label || "A") as any);
+      const arr = (os || []).map(o => ({ label: o.label, text: o.text }));
+      if (arr.length === 0) {
+        setEditOptions([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
+      } else {
+        setEditOptions(arr);
+      }
+      setEditCorrect(os?.find(o=>o.is_correct)?.label || (os?.[0]?.label || "A"));
     } else {
       setEditOptions([{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]);
       setEditCorrect("A");
@@ -316,9 +322,48 @@ export default function AdminTestDetail(){
     load();
   }
 
+  async function updateScoring(correct: number, negative: number) {
+    const policy = {
+      mcq: { correct, negative },
+      text: { correct, negative: 0 }
+    };
+    await supabase.from("tests").update({ scoring_policy: policy }).eq("id", testId);
+    setTestMeta(m => m ? { ...m, scoring_policy: policy } : null);
+  }
+
   return (
     <main className="space-y-6">
-      <h1 className="text-xl font-semibold">Manage Questions</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Manage Questions</h1>
+        {testMeta && (
+          <div className="flex items-center gap-4 bg-white border rounded-lg px-4 py-2 shadow-sm">
+            <div className="flex items-center gap-1.5 border-r pr-4">
+              <Settings2 size={16} className="text-neutral-500" />
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-tight">Marking</span>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">Correct</span>
+                <input 
+                  type="number" 
+                  className="w-12 text-sm font-bold bg-transparent outline-none" 
+                  value={testMeta.scoring_policy?.mcq?.correct ?? 1} 
+                  onChange={e => updateScoring(Number(e.target.value), testMeta.scoring_policy?.mcq?.negative ?? 0)}
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">Wrong</span>
+                <input 
+                  type="number" 
+                  className="w-12 text-sm font-bold bg-transparent outline-none" 
+                  value={testMeta.scoring_policy?.mcq?.negative ?? 0} 
+                  onChange={e => updateScoring(testMeta.scoring_policy?.mcq?.correct ?? 1, Number(e.target.value))}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <Card>
         <CardHeader title="Generate with AI" subtitle="Draft questions using Gemini Flash, then review & save." />
@@ -380,9 +425,9 @@ export default function AdminTestDetail(){
                     }} />
                     {d.type === "mcq" && (
                       <div className="grid gap-2">
-                        {["A","B","C","D"].map(L => {
-                          const idx = d.options?.findIndex(o=>o.label===L) ?? -1;
-                          const val = idx >=0 ? d.options![idx].text : "";
+                        {(d.options || []).map((opt, oIdx) => {
+                          const L = opt.label;
+                          const val = opt.text;
                           return (
                             <div key={L} className="flex items-center gap-2">
                               <span className="font-mono text-xs w-5">{L}.</span>
@@ -390,7 +435,7 @@ export default function AdminTestDetail(){
                                 const v = e.target.value;
                                 setDrafts(arr => arr.map((x,j)=>{
                                   if (j!==i) return x;
-                                  const opts = (x.options || [{label:"A",text:""},{label:"B",text:""},{label:"C",text:""},{label:"D",text:""}]).map(o => o.label===L ? { ...o, text: v } : o);
+                                  const opts = (x.options || []).map(o => o.label===L ? { ...o, text: v } : o);
                                   return { ...x, options: opts as any };
                                 }));
                               }} />
@@ -474,6 +519,37 @@ export default function AdminTestDetail(){
           )}
           {type==="mcq" && (
             <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Options</span>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const next = [...options];
+                      next.push({ label: getLabel(next.length), text: "" });
+                      setOptions(next);
+                    }}
+                    className="p-1 rounded border hover:bg-neutral-50 text-neutral-600"
+                    title="Add option"
+                  >
+                    <Plus size={14} />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (options.length <= 2) return;
+                      const next = options.slice(0, -1);
+                      setOptions(next);
+                      if (!next.find(o => o.label === correct)) setCorrect(next[0].label);
+                    }}
+                    className="p-1 rounded border hover:bg-neutral-50 text-neutral-600 disabled:opacity-30"
+                    disabled={options.length <= 2}
+                    title="Remove option"
+                  >
+                    <Minus size={14} />
+                  </button>
+                </div>
+              </div>
               {options.map((o,i)=>(
                 <div key={o.label} className="flex items-center gap-2">
                   <Input placeholder={`${o.label} option`} value={o.text} onChange={e=>{
@@ -604,6 +680,37 @@ export default function AdminTestDetail(){
                   </div>
                   {editType==="mcq" && (
                     <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-neutral-600">Options</span>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const next = [...editOptions];
+                              next.push({ label: getLabel(next.length), text: "" });
+                              setEditOptions(next);
+                            }}
+                            className="p-1 rounded border hover:bg-neutral-50 text-neutral-600"
+                            title="Add option"
+                          >
+                            <Plus size={14} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (editOptions.length <= 2) return;
+                              const next = editOptions.slice(0, -1);
+                              setEditOptions(next);
+                              if (!next.find(o => o.label === editCorrect)) setEditCorrect(next[0].label);
+                            }}
+                            className="p-1 rounded border hover:bg-neutral-50 text-neutral-600 disabled:opacity-30"
+                            disabled={editOptions.length <= 2}
+                            title="Remove option"
+                          >
+                            <Minus size={14} />
+                          </button>
+                        </div>
+                      </div>
                       {editOptions.map((o,i)=>(
                         <div key={o.label} className="flex items-center gap-2">
                           <Input value={o.text} onChange={e=>{
@@ -628,7 +735,7 @@ export default function AdminTestDetail(){
                     <Button onClick={saveEdit} disabled={busySave}>
                       {busySave ? "Saving..." : "Save"}
                     </Button>
-                    <Button className="bg-white text-neutral-900 border border-neutral-200 hover:bg-neutral-50" onClick={()=>setEditingId(null)} disabled={busySave}>Cancel</Button>
+                    <Button variant="cancel" onClick={()=>setEditingId(null)} disabled={busySave}>Cancel</Button>
                   </div>
                 </div>
               )}

@@ -17,6 +17,8 @@ export default function AdminTests() {
   const [guidelines, setGuidelines] = useState("");
   const [duration, setDuration] = useState<number | "">("");
   const [showScore, setShowScore] = useState(true);
+  const [correctMarks, setCorrectMarks] = useState<number>(1);
+  const [wrongMarks, setWrongMarks] = useState<number>(0);
   const [items, setItems] = useState<any[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
@@ -49,6 +51,10 @@ export default function AdminTests() {
       is_public: true,
       code,
       created_by: user.id,
+      scoring_policy: {
+        mcq: { correct: correctMarks, negative: wrongMarks },
+        text: { correct: correctMarks, negative: 0 }
+      }
     });
     if (!error) {
       setTitle(""); 
@@ -56,6 +62,8 @@ export default function AdminTests() {
       setGuidelines("");
       setDuration(""); 
       setShowScore(true);
+      setCorrectMarks(1);
+      setWrongMarks(0);
       load();
     }
   }
@@ -112,6 +120,29 @@ export default function AdminTests() {
           />
           Show final score to participant
         </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1">
+            <label className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Correct Answer</label>
+            <input
+              type="number"
+              className="border rounded px-3 py-2 text-sm font-medium"
+              placeholder="Marks (e.g. 1)"
+              value={correctMarks}
+              onChange={(e) => setCorrectMarks(Number(e.target.value))}
+            />
+          </div>
+          <div className="grid gap-1">
+            <label className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Wrong Answer</label>
+            <input
+              type="number"
+              className="border rounded px-3 py-2 text-sm font-medium"
+              placeholder="Marks (e.g. -0.25)"
+              value={wrongMarks}
+              onChange={(e) => setWrongMarks(Number(e.target.value))}
+            />
+          </div>
+        </div>
         <Button className="w-fit">Create</Button>
       </form>
 
